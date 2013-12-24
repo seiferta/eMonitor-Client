@@ -13,7 +13,8 @@ a = Analysis(
 pyz = PYZ(a.pure)
 exe = EXE(pyz,
           a.scripts,
-          exclude_binaries=1,
+          a.binaries,
+          #exclude_binaries=1,
           name=os.path.join('build\\pyi.win32\\build_output', 'mclient.exe'),
           debug=False,
           strip=False,
