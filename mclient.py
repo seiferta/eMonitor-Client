@@ -13,7 +13,7 @@ try:
 except getopt.GetoptError as err:
     print(err)
     sys.exit(2)
-    
+
 ID = 0
 ANY = "0.0.0.0"
 MCAST_ADDR = "224.168.2.9"
