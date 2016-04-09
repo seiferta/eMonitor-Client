@@ -13,7 +13,6 @@ from PyQt4 import QtCore, QtGui, QtWebKit, QtNetwork
 try:
     opts, extraparams = getopt.getopt(sys.argv[1:], 'i:h:p:w')
 except getopt.GetoptError as err:
-    print(err)
     sys.exit(2)
 
 ID = 0
@@ -23,8 +22,13 @@ MCAST_PORT = 1600
 FULLWINDOW = 1
 LOGLEVEL = 10  # debug, 40=error
 web = None
-VERSION = '0.4.0'
-STARTPAGE = '<html><body style="background-color:#000;color:#fff"></body></html>'
+VERSION = '0.4.1'
+STARTPAGE = '<html>' \
+            '<body style="background-color:#000;color:#fff">' \
+            '<p style="text-align:center;color:silver;padding-top:50%;font-size:100%;font-family:Arial">eMonitor-Client<br/>ver. {}</p>' \
+            '</body>' \
+            '</html>'.format(VERSION)
+BLANKPAGE = '<html><body style="background-color:#000;color:#fff"></body></html>'
 
 for item in opts:
     if item[0] == '-i':
@@ -55,8 +59,7 @@ def getLastLoad():
                     ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', line.rstrip().split()[-1])
                 if len(ip) > 0:
                     return ip[0]
-    else:
-        return ""
+    return None
 
 
 class AD_Listener(QtCore.QObject):
@@ -70,7 +73,7 @@ class AD_Listener(QtCore.QObject):
         self.sock.bind((ANY, MCAST_PORT))
         self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
 
-        status = self.sock.setsockopt(socket.IPPROTO_IP,
+        self.sock.setsockopt(socket.IPPROTO_IP,
                                       socket.IP_ADD_MEMBERSHIP,
                                       socket.inet_aton(MCAST_ADDR) + socket.inet_aton(ANY))
 
@@ -80,26 +83,28 @@ class AD_Listener(QtCore.QObject):
 
     def loop(self):
         global ID, web
-        logger.debug("mclient v 0.1 for eMonitor started with id %s, waiting for events..." % ID)
+        logip = getLastLoad()
+        logger.debug("mclient v {} for eMonitor started with id {}, waiting for events...".format(VERSION, ID))
 
         # init startpage
-
-        ip = getLastLoad()
-        if ip:
-            self.message.emit('http://{}/monitor/{}'.format(ip, ID))
+        if logip:
+            self.sock.sendto('initneed', (MCAST_ADDR, MCAST_PORT))
+            logger.debug("reload last source {}".format(logip))
+            self.message.emit('http://{}/monitor/{}'.format(logip, ID))
         else:
-            ip = None
+            self.message.emit('http://{}/monitor/{}'.format(logip, ID))
+            logger.debug("no source ip found.")
 
         while self.running:
             try:
                 data, addr = self.sock.recvfrom(1024)
-                print "ddd", data, addr
                 ts = time.gmtime()
             except socket.error, e:
                 pass
             else:
                 logger.debug("%s:%s - %s: --> %s" % (addr[0], addr[1], time.strftime('%Y.%m.%d - %H:%M:%S', ts), data))
                 data = data.split("|")
+                print "addr", addr
                 if len(data) > 1:
                     if data[0] in ['0', ID]:
                         if data[1] == "load":
@@ -125,10 +130,10 @@ class AD_Listener(QtCore.QObject):
                             logger.debug('RESET')
 
                         if data[1] == "ping":
-                            if ip is None:
+                            if not logip:
                                 self.sock.sendto('{}|initneed'.format(ID), (addr[0], addr[1]))
                             else:
-                                self.sock.sendto('{}|alive'.format(ID), (addr[0], addr[1]))
+                                self.sock.sendto('{}|alive|{}'.format(ID, VERSION), (addr[0], addr[1]))
                             logger.debug('PING')
 
                         if data[1] == "changeid":
@@ -145,10 +150,10 @@ class AD_Listener(QtCore.QObject):
 
 class WebPage(QtWebKit.QWebPage):
     def __init__(self):
-        super(QtWebKit.QWebPage, self).__init__()
+        QtWebKit.QWebPage.__init__(self)
 
     def userAgentForUrl(self, url):
-        return "mClient/1.0 (X11; raspberry arm; 1.0) mClient/2013 mClient/1.0"
+        return "mClient/{} (X11; raspberry arm; {}) mClient/2016 mClient/{}".format(VERSION, VERSION, VERSION)
 
 
 class AD_Window(QtGui.QMainWindow):
@@ -157,6 +162,7 @@ class AD_Window(QtGui.QMainWindow):
 
         self.request = None
         self.startpage = STARTPAGE
+        self.blankpage = BLANKPAGE
         self.webView = QtWebKit.QWebView()
         self.webView.setPage(WebPage())
 
@@ -191,7 +197,7 @@ class AD_Window(QtGui.QMainWindow):
         logger.debug(QtCore.qVersion())
         try:
             if message == "reset":
-                self.webView.setHtml(self.startpage)
+                self.webView.setHtml(self.blankpage)
             else:
                 self.request = QtNetwork.QNetworkRequest()
                 self.request.setRawHeader("Content-Type", QtCore.QByteArray('application/octet-stream'))
