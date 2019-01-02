@@ -7,15 +7,15 @@ import time
 import getopt
 import logging
 
-from PyQt4.QtCore import Qt
-from PyQt4 import QtCore, QtGui, QtWebKit, QtNetwork
+from PyQt5.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWebKit, QtNetwork, QtWebKitWidgets, QtWidgets
 
 try:
     opts, extraparams = getopt.getopt(sys.argv[1:], 'i:h:p:w')
 except getopt.GetoptError as err:
     sys.exit(2)
 
-ID = 0
+ID = 1
 ANY = "0.0.0.0"
 MCAST_ADDR = "224.168.2.9"
 MCAST_PORT = 1600
@@ -148,22 +148,22 @@ class AD_Listener(QtCore.QObject):
             time.sleep(2)
 
 
-class WebPage(QtWebKit.QWebPage):
+class WebPage(QtWebKitWidgets.QWebPage):
     def __init__(self):
-        QtWebKit.QWebPage.__init__(self)
+        QtWebKitWidgets.QWebPage.__init__(self)
 
     def userAgentForUrl(self, url):
         return "mClient/{} (X11; raspberry arm; {}) mClient/2016 mClient/{}".format(VERSION, VERSION, VERSION)
 
 
-class AD_Window(QtGui.QMainWindow):
+class AD_Window(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
-        QtGui.QMainWindow.__init__(self, parent)
+        QtWidgets.QMainWindow.__init__(self, parent)
 
         self.request = None
         self.startpage = STARTPAGE
         self.blankpage = BLANKPAGE
-        self.webView = QtWebKit.QWebView()
+        self.webView = QtWebKitWidgets.QWebView()
         self.webView.setPage(WebPage())
 
         self.webView.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -219,7 +219,7 @@ class AD_Window(QtGui.QMainWindow):
 
 
 if __name__ == "__main__":
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     web = AD_Window()
 
     if not os.path.exists('scripts'):
